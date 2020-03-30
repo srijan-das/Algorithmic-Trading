@@ -48,11 +48,3 @@ def get_adx(DF,span = 14):
             ADX.append(((span-1)*ADX[j-1] + DX[j])/span)
     df2['ADX']=np.array(ADX)
     return df2['ADX'].dropna()
-
-import pandas_datareader.data as pdr
-import pandas as pd
-
-aapl = pdr.get_data_yahoo('AAPL', pd.to_datetime('2017-01-01'), pd.to_datetime('2018-01-01'))
-aapl_adx = get_adx(aapl, 14)
-
-print(aapl_adx.head())
