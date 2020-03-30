@@ -9,4 +9,4 @@ def get_atr(data, span = 20) :
     df['TR'] = df[['H-L','H-PC','L-PC']].max(axis = 1, skipna = False)
     df['ATR'] = df['TR'].rolling(span).mean()
 
-    return df['ATR'].dropna()
+    return df[['ATR','TR']]
