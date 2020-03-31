@@ -3,6 +3,8 @@ import numpy as np
 import statsmodels.api as sm
 from stocktrends import Renko
 
+def get_available_functions() :
+    print("Following Functions are available: \nTechnical Indicators : \nADX, ATR, Bollinger Bands, MACD, OBV, Renko Chart, RSI, Slope \nKPI's : \nCAGR, Calmar, Maximum Drawdown, Sharpe, Sortino, Volatility")
 
 def get_atr(data, span = 20) :
     '''
@@ -14,8 +16,10 @@ def get_atr(data, span = 20) :
     df['L-PC'] = abs(df['Low'] - df['Adj Close'].shift(1))
     df['TR'] = df[['H-L','H-PC','L-PC']].max(axis = 1, skipna = False)
     df['ATR'] = df['TR'].rolling(span).mean()
-
-    return df[['ATR','TR']]
+    try:
+        return df[['ATR','TR']]
+    finally:
+        df = pd.DataFrame()
 
 def get_renko_df(data, days = 120, brick = -1) :
     '''
@@ -33,8 +37,10 @@ def get_renko_df(data, days = 120, brick = -1) :
         renko_df.brick_size = round(get_atr(data, span = days)['ATR'][-1], 0)
     else :
         renko_df.brick_size = brick
-
-    return renko_df.get_ohlc_data()
+    try:
+        return renko_df.get_ohlc_data()
+    finally:
+        df = pd.DataFrame()
 
 def get_slope(data, column = 'Adj Close', periods = 5) :
     '''
@@ -58,6 +64,7 @@ def get_slope(data, column = 'Adj Close', periods = 5) :
         slopes.append(results.params[-1])
     
     slope_angle = (np.rad2deg(np.arctan(np.array(slopes))))
+    
     return pd.DataFrame(np.array(slope_angle), columns=['Slope for consecutive {} periods'.format(periods)])
 
 def get_obv(data) :
@@ -70,7 +77,10 @@ def get_obv(data) :
     df['Direction'][0] = 0
     df['Adj Volume'] = df['Direction'] *df['Volume']
     df['obv'] = df['Adj Volume'].cumsum()
-    return df['obv']
+    try:
+        return df['obv']
+    finally:
+        df = pd.DataFrame()
 
 def get_adx(DF,span = 14):
     "function to calculate ADX"
@@ -117,7 +127,10 @@ def get_adx(DF,span = 14):
         elif j > 2*span-1:
             ADX.append(((span-1)*ADX[j-1] + DX[j])/span)
     df2['ADX']=np.array(ADX)
-    return df2['ADX']
+    try:
+        return df2['ADX']
+    finally:
+        df2 = pd.DataFrame()
 
 def get_rsi(data, span = 14) :
     '''
@@ -149,7 +162,10 @@ def get_rsi(data, span = 14) :
     df['avg_loss']=np.array(avg_loss)
     df['RS'] = df['avg_gain']/df['avg_loss']
     df['RSI'] = 100 - (100/(1+df['RS']))
-    return df['RSI']
+    try:
+        return df['RSI']
+    finally:
+        df = pd.DataFrame()
 
 def get_boll_bands(data, span=20, multiplier=2) :
     '''
@@ -164,8 +180,10 @@ def get_boll_bands(data, span=20, multiplier=2) :
     df['BB_up'] = df['MA'] + df['std_rolling'] * multiplier
     df['BB_down'] = df['MA'] - df['std_rolling'] * multiplier
     df['BB_range'] = df['BB_up'] - df['BB_down']
-
-    return df[['MA','BB_up','BB_down','BB_range']]
+    try:
+        return df[['MA','BB_up','BB_down','BB_range']]
+    finally:
+        df = pd.DataFrame()
 
 def get_macd(df, slow_span=26, fast_span=12, signal_span=9):
     '''
@@ -178,5 +196,114 @@ def get_macd(df, slow_span=26, fast_span=12, signal_span=9):
     df_copy['MACD'] = df_copy['MA Fast'] - df_copy['MA Slow']
     df_copy['MACD Signal'] = df_copy['MACD'].ewm(span=signal_span, min_periods = signal_span).mean()
     df_copy.dropna(inplace = True)
-    
-    return df_copy[['MACD','MACD Signal','Adj Close']]
+    try:
+        return df_copy[['MACD','MACD Signal','Adj Close']]
+    finally:
+        df = pd.DataFrame()
+
+def get_cagr(data, frequency = 'daily') :
+    '''
+    Should Contain 'Adj Close'\n
+    frequency = 'daily', 'weekly', 'monthly', 'yearly'
+    '''
+    df = data.copy()
+    df['Daily Returns'] = df['Adj Close'].pct_change(1)
+    df['Cumulative Return'] = (1 + df['Daily Returns']).cumprod()
+
+    years = 0
+
+    if frequency == 'daily' :
+        years = len(df) / 252
+    elif frequency == 'weekly' :
+        years = len(df) / 52
+    elif frequency == 'monthly' :
+        years = len(df) / 12
+    else :
+        years = len(df)
+
+    CAGR = (df['Cumulative Return'][-1]) ** (1 / years) - 1
+    try:
+        return CAGR
+    finally:
+        df = pd.DataFrame()
+
+def get_volatility(data, frequency = 'Daily') :
+    '''
+    Should Contain 'Adj Close'\n
+    frequency = 'daily', 'weekly', 'monthly', 'yearly'
+    '''
+    df = data.copy()
+    df['Daily Returns'] = df['Adj Close'].pct_change(1)
+    vol = df['Daily Returns'].std()
+    if frequency == 'daily' :
+        vol = vol * (252 ** 0.5)
+    elif frequency == 'weekly' :
+        vol = vol * (52 ** 0.5)
+    elif frequency == 'monthly' :
+        vol = vol * (12 ** 0.5)
+    try:
+        return vol
+    finally:
+        df = pd.DataFrame()
+
+def get_sharpe(data, frequency = 'daily', risk_free_rate = 0) :
+    '''
+    Should Contain 'Adj Close'\n
+    frequency = 'daily', 'weekly', 'monthly', 'yearly'
+    '''
+    sr = (get_cagr(data, frequency=frequency) - risk_free_rate) / get_volatility(data, frequency)
+    return sr
+
+def get_sortino(data, frequency = 'daily', risk_free_rate = 0) :
+    '''
+    Should Contain 'Adj Close'\n
+    frequency = 'daily', 'weekly', 'monthly', 'yearly'
+    '''
+    df = data.copy()
+
+    df['Daily Returns'] = df['Adj Close'].pct_change(1)
+    neg_vol = df[df['Daily Returns']<0]['Daily Returns'].std()
+
+    if frequency == 'daily' :
+        neg_vol = neg_vol * (252 ** 0.5)
+    elif frequency == 'weekly' :
+        neg_vol = neg_vol * (52 ** 0.5)
+    elif frequency == 'monthly' :
+        neg_vol = neg_vol * (12 ** 0.5)
+
+    sor = (get_cagr(data, frequency=frequency) - risk_free_rate) / neg_vol
+
+    try:
+        return sor
+    finally:
+        df = pd.DataFrame()
+
+def get_max_drawdown(data) :
+    '''
+    Should Contain 'Adj Close'\n
+    Returns percentage
+    '''
+    df = data.copy()
+    df['Daily Returns'] = df['Adj Close'].pct_change(1)
+    df['Cumulative Return'] = (1 + df['Daily Returns']).cumprod()
+
+    df['cr_roll_max'] = df['Cumulative Return'].cummax()
+
+    df['drawdown'] = df['cr_roll_max'] - df['Cumulative Return']
+    df['dd_pct'] = df['drawdown'] / df['cr_roll_max']
+    max_drawdown = df['dd_pct'].max()
+
+    try:
+        return max_drawdown * 100
+    finally:
+        df = pd.DataFrame()
+
+def get_calmar(data, frequency = 'daily') :
+    '''
+    Should Contain 'Adj Close'\n
+    frequency = 'daily', 'weekly', 'monthly', 'yearly'
+    '''
+
+    cal = get_cagr(data, frequency) / (get_max_drawdown(data) / 100)
+
+    return cal
